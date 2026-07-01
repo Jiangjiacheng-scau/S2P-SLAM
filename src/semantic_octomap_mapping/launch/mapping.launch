@@ -1,0 +1,46 @@
+<launch>
+  <param name="/use_sim_time" value="true" />
+
+  <rosparam command="load" file="$(find faster_lio)/config/cp_lio.yaml" />
+  <node pkg="faster_lio" type="run_mapping_online" name="laserMapping" output="screen" />
+
+  <node pkg="tf" type="static_transform_publisher" name="camera_base_link" 
+        args="0.1 0 0 1.5708 0 0 body front_camera_color_optical_frame 100" />
+
+  <node pkg="semantic_octomap_mapping" type="semantic_octomap_node" name="semantic_octomap_node" output="screen">
+    
+    <param name="z_ceiling" value="3.5" />
+    <param name="lidar_z_min" value="0.3" />
+    <param name="lidar_z_max" value="2.5" />
+    <param name="leg_spacing" value="1.8" />
+
+    <param name="z_obstacle_thresh" value="2.05" />
+    <param name="ground_offset_k" value="0.5" />
+    
+    <param name="ground_safe_height_ratio" value="1" />
+    <param name="ground_safe_width_ratio" value="0" />
+
+    <param name="camera_z_shift" value="-0.2" />
+
+    <param name="hole_fill_area" value="4000.0" />
+    <param name="hsv_s_min" value="40" /> 
+    <param name="hsv_v_min" value="30" /> 
+
+    <param name="kernel_far_w" value="1" /> <param name="kernel_far_h" value="3" />
+    <param name="kernel_near_w" value="2" /> <param name="kernel_near_h" value="10" />
+
+    <param name="roi_h_ratio" value="0.1" />
+    <param name="roi_w_ratio" value="0.06" />
+    <param name="trigger_thresh" value="0.10" />
+    <param name="cooldown_time" value="1.5" />
+    <param name="motion_deadzone" value="0.05" />
+    <param name="hard_sync_diff" value="1.0" />
+
+  </node>
+
+  <node pkg="rviz" type="rviz" name="rviz" args="-d /home/jiangjiacheeng/chicken_nav_ws/1.rviz" />
+  <node pkg="rosbag" type="play" name="rosbag_play" 
+        args="--clock -d 2 $(env HOME)/数据集/single2.bag" 
+        output="screen" 
+        required="false"/>
+</launch>   

@@ -1,0 +1,12 @@
+<launch>
+  <arg name="rviz" default="true" />
+
+  <rosparam command="load" file="$(find faster_lio)/config/cp_lio.yaml" />
+
+  <node pkg="faster_lio" type="run_mapping_online" name="laserMapping" output="screen" />
+
+  <group if="$(arg rviz)">
+     <node pkg="rviz" type="rviz" name="rviz" args="-d /home/jiangjiacheeng/chicken_nav_ws/1.rviz" />
+  </group>
+
+</launch>

@@ -1,0 +1,61 @@
+common:
+  dataset: "poultry_farm"        # Dataset name, used for log folder naming
+  lid_topic: "/point_cloud_raw"  # ⚠️ Modified: Your VLP-16 topic name
+  imu_topic: "/imu"              # ⚠️ Modified: Your external IMU topic name
+  time_sync_en: false            # Set to 'false' when playing back rosbag without hardware sync
+  time_offset_lidar_to_imu: 0.0  # Adjust if there is a constant time delay between LiDAR and IMU
+  use_odom: false   # true: 开启融合; false: 纯LiDAR+IMU
+preprocess:
+  lidar_type: 2                  # 2 = Velodyne LiDAR (VLP-16)
+  scan_line: 16                  # ⚠️ Modified: VLP-16 has 16 lines (critical for index calculation)
+  scan_rate: 10                  # Standard frequency for VLP-16 is 10Hz
+  blind: 0.3                     # Blind zone (meters). Keep 0.5m to filter out the robot body in narrow aisles
+  timestamp_unit: 2              # ⚠️ Important: ROS Bag timestamp unit. 
+                                 # 2 = Seconds (Standard ROS driver). Try 0 or 1 if point cloud freezes.
+  time_scale: 1e-3               # Scale factor for point timestamps (keep for compatibility)
+
+mapping:
+  acc_cov: 0.1                   # IMU accelerometer covariance
+  gyr_cov: 0.1                   # IMU gyroscope covariance
+  b_acc_cov: 0.0001              # Accelerometer bias covariance
+  b_gyr_cov: 0.0001              # Gyroscope bias covariance
+  fov_degree: 360                # VLP-16 has 360 horizontal FOV
+  det_range: 50.0                # ⚠️ Reduced from 100.0. Poultry houses are confined; reducing this saves memory.
+
+  # --- Extrinsic Configuration (CRITICAL) ---
+  extrinsic_est_en: false      # ⚠️ Strongly Recommended: FALSE
+                                 # Reason: In degenerate environments (long corridors), online estimation 
+                                 # often diverges. Fixed extrinsics are much more robust.
+  
+  extrinsic_T: [ 0.035, 0.01, -0.1]
+  extrinsic_R: [ 0.112429,   -0.993629, -0.00778082,
+                   0.993323,    0.112592,  -0.0251654,
+                   0.0258811, -0.00489953,    0.999653]
+publish:
+  path_publish_en: true          # Publish trajectory for Rviz
+  scan_publish_en: true          # Publish registered point cloud
+  scan_effect_pub_en: true       # Publish effective feature points
+  dense_publish_en: true         # ⚠️ Set to true to see a denser map in Rviz
+  scan_bodyframe_pub_en: true    # Publish scan in body frame
+
+path_save_en: true               # Save trajectory to file (essential for paper comparison)
+
+pcd_save:
+  pcd_save_en: true           # Disable during debugging to save disk space. Enable for final mapping.
+  interval: -1                   # -1 means save all frames into one file
+
+feature_extract_enable: false    # Keep false. Faster-LIO uses raw points, not edge/planar features.
+point_filter_num: 3              # ⚠️ Reduced from 6. Since VLP-16 is sparse, we want to keep more points.
+max_iteration: 3                 # Optimization iterations
+
+# --- Optimization for Poultry Cages ---
+filter_size_surf: 0.3            # ⚠️ Reduced from 0.5. Cages have fine meshes; 0.5 is too coarse.
+filter_size_map: 0.3             # ⚠️ Reduced from 0.5. Map downsampling size.
+cube_side_length: 1000           # Size of the local map box
+
+# --- iVox Parameters (Core of Faster-LIO) ---
+ivox_grid_resolution: 0.3        # ⚠️ Reduced from 0.5.
+                                 # A finer resolution (0.2m) helps distinguish cage bars and feeders
+                                 # from the walls, improving matching accuracy in the farm.
+ivox_nearby_type: 18             # Neighbor search type (6, 18, or 26). 18 balances speed and accuracy.
+esti_plane_threshold: 0.1        # Threshold for plane estimation
