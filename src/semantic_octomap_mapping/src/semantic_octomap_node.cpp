@@ -12,7 +12,6 @@
 #include <octomap/ColorOcTree.h> 
 #include <octomap_msgs/Octomap.h>
 #include <octomap_msgs/conversions.h>
-// 在文件最上面的 include 区域添加这行
 #include <pcl/filters/voxel_grid.h>
 #include <pcl_ros/point_cloud.h>
 #include <pcl/kdtree/kdtree_flann.h>
@@ -37,13 +36,13 @@
 #include <unordered_map>
 #include <vector>
 #include <mutex>
-#include <shared_mutex> // [新增] C++17 读写锁
+#include <shared_mutex>
 #include <numeric>
 
 #include <gtsam/geometry/Pose3.h>
 #include <gtsam/geometry/Rot3.h>
 #include <gtsam/geometry/Point3.h>
-#include <gtsam/geometry/Unit3.h> // [新增] 引入单位球面流形几何
+#include <gtsam/geometry/Unit3.h>
 #include <gtsam/geometry/Cal3_S2.h>       
 #include <gtsam/geometry/PinholeCamera.h> 
 #include <gtsam/geometry/OrientedPlane3.h> 
@@ -71,9 +70,7 @@ using namespace gtsam;
 
 
 
-// ================= [🔴 请复制并替换整个 DataLogger 类] =================
 
-// [新增] 全局数据记录器类 (包含所有实验数据接口 - 最终完整版)
 class DataLogger {
     public:
         // 1. 基础实验数据
@@ -95,10 +92,8 @@ class DataLogger {
         std::string base_path = "/home/jiangjiacheeng/spm_data/"; 
     
         DataLogger() {
-            // 创建目录
             mkdir(base_path.c_str(), 0777);
     
-            // 打开所有文件流
             f_traj.open(base_path + "trajectory.txt", std::ios::out);
             f_slip.open(base_path + "slip_params.txt", std::ios::out);
             f_eigen.open(base_path + "eigen_stats.txt", std::ios::out);
@@ -110,7 +105,6 @@ class DataLogger {
             f_flow_stats.open(base_path + "flow_stats.txt", std::ios::out);
             f_leg_idx.open(base_path + "leg_indices.txt", std::ios::out);
             
-            // ================== [写入详细表头] ==================
             
             // 轨迹: 时间, 位置(x,y,z), 姿态(qx,qy,qz,qw), 速度(vx,vy,vz)
             f_traj << "time x y z qx qy qz qw vx vy vz" << std::endl;
@@ -118,7 +112,6 @@ class DataLogger {
             // 滑移: 时间, 滑移系数(kv, kw), 动态方差, 控制指令, 是否转向
             f_slip << "time kappa_v kappa_omega sigma_slip_v sigma_slip_w cmd_v cmd_w is_turning" << std::endl; 
             
-            // [🔴 修改] 特征值表头增加了 'constraint_sigma' (约束硬度)
             f_eigen << "time lambda_max_cov is_degenerate structure_lock_active constraint_sigma" << std::endl;
             
             // 特征: 时间, 周期性间距, 置信度, VP Yaw, VP内点, VP有效性, 走廊角度, 线特征有效性
@@ -130,13 +123,11 @@ class DataLogger {
             // 标定: 时间, Yaw偏置, Pitch偏置
             f_calib << "time yaw_bias_deg pitch_bias_deg" << std::endl;
     
-            // [🔴 修改] 地图统计增加了 'dynamic_points_rejected' (动态剔除数)
             f_map_stats << "time node_count memory_usage_mb dynamic_points_rejected static_points_inserted" << std::endl;
     
             // 图误差: 时间, 总误差(Chi2), 归一化误差
             f_graph_error << "time total_error error_norm" << std::endl;
             
-            // [🔴 新增] 光流统计: 时间, 视觉速度, 预测速度, 置信度, 深度, 计算出的Sigma
             f_flow_stats << "time vis_vel_x pred_vel_x confidence avg_depth calculated_sigma weight_active" << std::endl;
 
             f_leg_idx << "time leg_index predicted_dist current_spacing is_snap_event" << std::endl;
@@ -158,10 +149,8 @@ class DataLogger {
         }
     };
     
-    // 全局实例
     DataLogger g_logger;
     
-    // ================= [🔴 替换结束] =================
 
 struct SystemConfig {
     double leg_spacing;
@@ -223,11 +212,9 @@ struct SystemConfig {
     int temporal_hit_thresh;
     double temporal_static_life;
 
-    // [新增] 自适应滑移学习参数
     double slip_learn_sigma_base;    // 静态或直行时的滑移参数波动率
     double slip_learn_sigma_gain;    // 转向时的滑移参数不确定性增益
 
-    // [新增 - 修复报错] 必须添加以下缺失参数
     double degeneracy_lock_sigma;   // 退化时的锁定强度
     int temporal_trust_thresh;      // 信任计数阈值 (多视角验证)
 
@@ -309,11 +296,9 @@ void loadParameters(ros::NodeHandle& nh) {
     nh.param<int>("temporal_hit_thresh", config.temporal_hit_thresh, 3);
     nh.param<double>("temporal_static_life", config.temporal_static_life, 2.0);
 
-    // base: 1e-4 表示在直行时我们非常信任之前的滑移估计，不轻易改变
     nh.param<double>("slip_learn_sigma_base", config.slip_learn_sigma_base, 1e-4); 
     // gain: 0.01 表示每增加 1rad/s 的转向，滑移参数的不确定性增加 0.01
     nh.param<double>("slip_learn_sigma_gain", config.slip_learn_sigma_gain, 0.01);
-    // [新增 - 修复报错] 加载缺失参数
     // 当检测到退化时，强行将周期性约束的 sigma 压到极小 (0.01)，相当于权重极大，锁死位置
     nh.param<double>("degeneracy_lock_sigma", config.degeneracy_lock_sigma, 0.01);
     
@@ -393,7 +378,6 @@ class ExtrinsicCalibrator {
             return gtsam::Rot3::Ypr(yaw_bias_, pitch_bias_, 0.0);
         }
 
-        // [🔴 新增代码] 获取当前偏置值用于记录
         std::pair<double, double> getCurrentBias() {
             return {yaw_bias_, pitch_bias_};
         }
@@ -442,11 +426,10 @@ class PeriodicityEstimator {
         PeriodicityEstimator() : estimated_spacing_(1.66), confidence_(0.0) {}
     
 
-        // [🔴 新增] 手动重置函数
         void reset() {
             local_x_history_.clear();
-            estimated_spacing_ = 1.66; // 恢复初始值
-            confidence_ = 0.0;         // 恢复初始置信度
+            estimated_spacing_ = 1.66;
+            confidence_ = 0.0;
         }
         void addPoints(const pcl::PointCloud<pcl::PointXYZI>::Ptr& cloud, 
                 const gtsam::Pose3& current_pose, 
@@ -699,7 +682,6 @@ public:
 };
 
 
-// [修复版] Manifold VP Factor - 支持双向走廊
 // 自动检测并适配 +X 或 -X 方向的行进
 class ManifoldVPFactor : public gtsam::NoiseModelFactor1<gtsam::Pose3> {
     private:
@@ -719,7 +701,6 @@ class ManifoldVPFactor : public gtsam::NoiseModelFactor1<gtsam::Pose3> {
             double nx = (uv_measurement.x - K.px()) / K.fx();
             double ny = (uv_measurement.y - K.py()) / K.fy();
             measured_direction_cam_ = gtsam::Unit3(gtsam::Vector3(nx, ny, 1.0));
-            // 注意：不再在这里写死 world_axis_，移到 evaluateError 中动态判断
         }
     
         gtsam::Vector evaluateError(const gtsam::Pose3& pose_w_b, 
@@ -734,13 +715,10 @@ class ManifoldVPFactor : public gtsam::NoiseModelFactor1<gtsam::Pose3> {
                 // 3. 将全局 X 轴投影到当前相机坐标系 (如果在 +X 方向行驶时的预测灭点)
                 gtsam::Unit3 predicted_cam = pose_w_c.rotation().unrotate(world_axis_pos, boost::none); 
 
-                // 4. [修复核心] 检查方向对齐情况
-                // 如果点积为负，说明我们正朝向 -X 方向行驶。
                 // 在走廊中，无论朝东还是朝西，只要平行于轴线，灭点约束都应有效。
                 double dot = measured_direction_cam_.unitVector().dot(predicted_cam.unitVector());
                 
                 if (dot < 0.0) {
-                    // 我们正背对 +X 轴。
                     // 将预测向量反转，使其指向相机坐标系的“前方”，
                     // 这样才能正确计算与测量值（也在前方）的误差。
                     predicted_cam = gtsam::Unit3(-predicted_cam.unitVector());
@@ -748,7 +726,7 @@ class ManifoldVPFactor : public gtsam::NoiseModelFactor1<gtsam::Pose3> {
                 }
                 
                 // 5. 安全检查：如果反转后偏差依然过大（例如面朝墙壁），则忽略
-                if (dot < 0.2) { // 稍微提高阈值到 0.2 (~78度) 以增加安全性
+                if (dot < 0.2) {
                     if (H) *H = gtsam::Matrix::Zero(2, 6);
                     return gtsam::Vector2::Zero();
                 }
@@ -758,7 +736,6 @@ class ManifoldVPFactor : public gtsam::NoiseModelFactor1<gtsam::Pose3> {
                     *H = gtsam::numericalDerivative11<gtsam::Vector, gtsam::Pose3>(
                         boost::bind(&ManifoldVPFactor::evaluateError, this, _1, boost::none), pose_w_b, 1e-5);
                     
-                    // [核弹级修复] 雅可比矩阵 NaN/Inf 检查
                     bool is_bad_jacobian = false;
                     for(int i=0; i<H->rows(); ++i) {
                         for(int j=0; j<H->cols(); ++j) {
@@ -778,7 +755,6 @@ class ManifoldVPFactor : public gtsam::NoiseModelFactor1<gtsam::Pose3> {
                 // 7. 计算误差
                 gtsam::Vector2 error = measured_direction_cam_.errorVector(predicted_cam);
                 
-                // 输出结果再次检查
                 if (!std::isfinite(error[0]) || !std::isfinite(error[1])) {
                     if (H) *H = gtsam::Matrix::Zero(2, 6);
                     return gtsam::Vector2::Zero();
@@ -787,7 +763,6 @@ class ManifoldVPFactor : public gtsam::NoiseModelFactor1<gtsam::Pose3> {
                 return error;
     
             } catch (...) {
-                // 捕获所有几何异常
                 if (H) *H = gtsam::Matrix::Zero(2, 6);
                 return gtsam::Vector2::Zero();
             }
@@ -854,7 +829,6 @@ public:
     }
 };
 
-// [🔴 核心升级] 语义线特征因子：同时锁定 航向角(Yaw) 和 横向位置(Y)
 class SemanticLineFactor : public gtsam::NoiseModelFactor1<gtsam::Pose3> {
     private:
         double measured_angle_; 
@@ -867,16 +841,12 @@ class SemanticLineFactor : public gtsam::NoiseModelFactor1<gtsam::Pose3> {
               measured_angle_(measured_angle), measured_dist_(measured_dist), line_global_y_(line_global_y) {}
     
         gtsam::Vector evaluateError(const gtsam::Pose3& pose, boost::optional<gtsam::Matrix&> H = boost::none) const override {
-            // 1. 角度误差 (原有逻辑)
             double global_yaw = pose.rotation().yaw();
             double line_angle_world = global_yaw + measured_angle_;
             double error_angle = std::sin(line_angle_world); // 假设墙是平行于 X 轴的
 
-            // 2. [新增] 横向距离误差
             // 逻辑：机器人的 Y 坐标 + (方向符号 * 测量距离) 应该等于 墙的全局 Y
-            // 这里我们需要判断墙在机器人的左边还是右边。
             // 简化假设：如果在走廊正中，measure_dist 是正值。
-            // 我们构建一个误差： |PoseY - GlobalWallY| - MeasuredDist
             double dist_error = (std::abs(pose.y() - line_global_y_) - measured_dist_);
 
             if (H) {
@@ -1056,12 +1026,10 @@ class VanishingPointDetector {
             std::vector<cv::Point> floor_poly; 
         }; 
     
-        // [修改] 增强版 VP 检测：增加静止保护、方差检查和自动重置
     VPResult detect(cv::Mat& img_for_debug, bool is_robot_stationary) { 
         VPResult res = {false, 0.0, cv::Point2f(0,0), 0, {}};
         
         // 1. 静止保护 (Stationary Protection)
-        // 如果机器人静止且已经锁定，我们大幅降低过程噪声，相当于“冻结”滤波器
         // 这样即使画面有噪点，VP 点也不会乱跑
         if (is_robot_stationary && has_lock_) {
              KF_.processNoiseCov = cv::Scalar::all(1e-7); // 冻结状态
@@ -1083,7 +1051,6 @@ class VanishingPointDetector {
         
         std::vector<LineObj> candidates;
         
-        // [新增] 严格的角度过滤器
         for(auto l_raw : lines_i) {
             cv::Vec4f l(l_raw[0], l_raw[1], l_raw[2], l_raw[3]);
             float dx = l[2] - l[0]; 
@@ -1107,7 +1074,6 @@ class VanishingPointDetector {
             return res; 
         }
         
-        // RANSAC 投票逻辑 (保持原有逻辑，稍作参数调整)
         int w = gray.cols; int h = gray.rows;
         double best_total_score = 0.0; 
         int best_inlier_count = 0; 
@@ -1145,7 +1111,6 @@ class VanishingPointDetector {
             }
         }
 
-        // [新增] 动态阈值：非锁定状态下需要更多内点才能激活，防止误触发
         int required_inliers = has_lock_ ? 5 : 8; 
 
         if (best_inlier_count > required_inliers) { 
@@ -1163,7 +1128,6 @@ class VanishingPointDetector {
                 kf_initialized_ = true;
                 lock_frames_ = 0;
             } else {
-                // [关键修改] 发散检测 (Innovation Check)
                 // 如果测量值和预测值偏差极大（比如 > 150像素），说明可能检测到了错误的墙缝或噪点
                 // 此时不要强行平滑，而是选择：1. 忽略该帧（保持原样） 或 2. 如果长期偏差则重置
                 double dist_pred = cv::norm(predicted_pt - raw_best_vp);
@@ -1205,17 +1169,14 @@ class VanishingPointDetector {
             smoothed_yaw_ = measured_yaw; 
             res.yaw = smoothed_yaw_;
             
-            // Debug 画图
             for (const auto& obj : candidates) {
                 if (distPointToLine(res.pt, obj.l) < 10.0) 
                     cv::line(img_for_debug, cv::Point(obj.l[0], obj.l[1]), cv::Point(obj.l[2], obj.l[3]), cv::Scalar(0, 255, 0), 2);
             }
             generateFloorPolygon(res, w, h, candidates, gray);
         } else { 
-            // 丢失锁定
             has_lock_ = false; 
             lock_frames_ = 0;
-            // [建议] 丢失后重置初始化状态，避免下次重连时被旧的漂移值影响
             kf_initialized_ = false; 
         }
         return res;
@@ -1446,7 +1407,6 @@ public:
     }
 
 
-    // 在 class FactorGraphTracker 的 public: 下面添加
     void hardReset(const gtsam::Pose3& pose, const gtsam::Vector3& vel) {
         gtsam::ISAM2Params params;
         params.relinearizeThreshold = 0.1;
@@ -1479,9 +1439,6 @@ public:
         
         
     }
-        // [修复编译报错版] predictAndUpdate
-    // [完整修复版] predictAndUpdate
-    // 包含：摆渡模式屏蔽、柔性网格吸附、防炸图轨道锁定、智能航向仲裁
     void predictAndUpdate(ros::Time now, bool leg_trigger_active, 
         double estimated_spacing, double periodicity_conf, 
         bool has_vp, double vp_yaw, cv::Point2f vp_pixel, double vp_conf, 
@@ -1495,11 +1452,10 @@ public:
         bool use_course_lock, double target_course_yaw,
         gtsam::Point3 anchor_point,
         bool is_ferrying,
-        double lio_lateral_vel) {  // <--- [🔴 新增参数]
+        double lio_lateral_vel) {
         
-        double log_structure_sigma = 0.0; // [新增] 用于记录本帧约束强度
+        double log_structure_sigma = 0.0;
 
-        // --- 关键帧检查 ---
         if (last_keyframe_time_.isZero()) {
             last_keyframe_time_ = now;
             last_keyframe_pose_ = current_pose_; 
@@ -1535,14 +1491,11 @@ public:
         bool is_startup_phase = (key_index_ < 60);
         
         // 曼哈顿约束开关 (在函数内定义，方便后续逻辑使用)
-        bool use_manhattan = !has_vp; // 默认策略：没有 VP 时才尝试用曼哈顿
+        bool use_manhattan = !has_vp;
 
         gtsam::Pose3 pred_pose;
         gtsam::Vector3 pred_vel;
 
-        // =========================================================
-        // --- 1. 运动学预测 (Odometry) & 混合速度约束 (LIO Lateral) ---
-        // =========================================================
         if (is_stationary) {
             pred_pose = current_pose_;
             pred_vel = gtsam::Vector3(0,0,0);
@@ -1559,18 +1512,16 @@ public:
             double pred_v = wheel_vel_x * current_calib_(0);
             double pred_w = wheel_omega * current_calib_(1); 
             
-            // [🔴 修改] 预测步骤：加入 LIO 的横向速度分量
             // 之前的逻辑假设 dy=0，现在使用 LIO 估计的侧滑速度进行位姿推演
             // 这确保了预测轨迹本身就包含了侧滑，减少了与视觉观测的冲突
             gtsam::Pose3 odom_delta = gtsam::Pose3(
                 gtsam::Rot3::Ypr(pred_w * dt, 0, 0), 
-                gtsam::Point3(pred_v * dt, lio_lateral_vel * dt, 0) // <--- 关键点：注入横向位移
+                gtsam::Point3(pred_v * dt, lio_lateral_vel * dt, 0)
             );
             
             pred_pose = current_pose_.compose(odom_delta);
-            pred_vel = gtsam::Vector3(pred_v, lio_lateral_vel, 0); // <--- 更新预测速度
+            pred_vel = gtsam::Vector3(pred_v, lio_lateral_vel, 0);
 
-            // TrackKinematicsFactor (相对约束 - 保持原有逻辑)
             double abs_w = std::abs(wheel_omega);
             gtsam::Vector6 odom_sigmas;
             
@@ -1591,7 +1542,6 @@ public:
                 )
             ));
 
-            // 自适应滑移参数学习 (保持原有逻辑)
             double current_slip_sigma;
             if (is_reversing) {
                 current_slip_sigma = 1e-6; 
@@ -1611,7 +1561,6 @@ public:
             new_factors.add(PriorFactor<Vector2>(C(key_index_), gtsam::Vector2(1.18, 1.0), 
                 noiseModel::Diagonal::Sigmas(gtsam::Vector2(0.1, 0.2)))); 
 
-            // [🔴 核心修改] 混合速度约束 (Hybrid Velocity Constraint)
             // 目标：Vx 使用编码器(纵向准确)，Vy 使用 LIO(横向侧滑准确)
             
             double target_vx = wheel_vel_x * current_calib_(0);
@@ -1641,17 +1590,11 @@ public:
         new_values.insert(C(key_index_), current_calib_);
 
 
-        // =========================================================
-        // --- [🔴 摆渡模式判断] ---
         // 如果处于摆渡模式 (is_ferrying = true)，跳过后续大部分几何约束
-        // =========================================================
         
         if (!is_ferrying) {
 
-            // --- 2. 视觉灭点 (VP) ---
             // 增加角速度限制：只有在走直线时才信任灭点，转弯时(omega > 0.2)不信任
-            // --- 2. 视觉灭点 (VP) ---
-            // [修改 2] 智能阈值：如果是轨道锁定状态(use_course_lock)，放宽转弯判定
             // 倒车时摆动大，阈值设为 0.4；普通模式设为 0.2
             double turn_thresh = use_course_lock ? 0.4 : 0.2;
 
@@ -1686,14 +1629,12 @@ public:
                 ROS_INFO_THROTTLE(1.0, "[Turn] Turning (w=%.2f). VP Factors DISABLED.", wheel_omega);
             }
 
-            // --- 3. 光流 (Flow) ---
             // 摆渡模式下也跳过光流，防止在大厅因动态物体产生误导
             if (has_vis_vel && !is_stationary && !front_wall_detected && !is_reversing) {
                 double flow_sigma = 0.03 + 0.03 * (1.0 - vis_conf);
                 double depth_penalty = 1.0 + 0.05 * (avg_vis_depth * avg_vis_depth);
                 flow_sigma *= depth_penalty;
 
-                // ================= [🔴 补全 1: 写入光流日志] =================
                 if (g_logger.f_flow_stats.is_open()) {
                     g_logger.f_flow_stats << std::fixed << std::setprecision(5)
                         << now.toSec() << " "
@@ -1705,7 +1646,6 @@ public:
                         << 1.0                    // Active 标记
                         << std::endl;
                 }
-                // ==========================================================
 
                 gtsam::Vector3 flow_sigmas(flow_sigma, flow_sigma * 1.5, flow_sigma * 1.5);
                 gtsam::Vector3 constrained_vis_vel = vis_vel;
@@ -1722,33 +1662,25 @@ public:
                 }
             }
 
-            // --- 4. 线特征 (墙体几何约束) ---
             if (has_line) {
                 double final_angle = line_res.angle; 
                 double measured_dist = line_res.distance;
 
-                // [新增] 墙体位置初始化与更新 (低通滤波)
                 // 计算当前测量对应的“墙在哪里”： Current_Wall_Y = Pose_Y +/- Measured_Dist
-                // 我们假设墙在机器人的一侧。为了简化，我们取绝对值距离。
-                // 这里的逻辑假设：墙是平行于 X 轴的。
                 
                 double current_implied_wall_y = 0.0;
                 
                 // 简单的启发式判断：墙在左边还是右边？
                 // 如果 line_res 来自 pcl::SACSegmentation，它通常返回的是直线方程。
-                // 这里我们假设 measure_dist 是正值，我们需要判断方向。
-                // 这是一个简化策略：假设我们总是锁定离机器人最近的那堵墙，并假设它不动。
                 
                 double side_sign = (current_pose_.y() > 0) ? 1.0 : -1.0; // 假设 Y=0 是走廊中心
-                // 如果你的坐标系不是以走廊为中心，这里可能需要调整
                 // 更好的方式：利用上一次的 wall_y 来判断
                 
                 if (!wall_y_initialized_) {
                     // 初始化：假设机器人当前位置是准确的，反推墙的位置
                     if (std::abs(current_pose_.y()) < 0.1) { // 只有在中心附近才初始化
                          // 这是一个猜测，假设墙在 +Y 或 -Y 方向
-                         // 你可能需要根据实际点云的重心来判断墙在左还是右
-                         estimated_wall_y_ = current_pose_.y() + measured_dist; // 默认 +Y
+                         estimated_wall_y_ = current_pose_.y() + measured_dist;
                          // 或者根据 line_res 的系数来判断方向
                     }
                     // 暂时跳过初始化帧
@@ -1764,7 +1696,6 @@ public:
                     }
 
                     // 平滑更新墙的位置 (这就像是一个 SLAM 的 Mapping 过程)
-                    // Alpha = 0.05, 也就是我们非常信任历史的墙位置（因为墙不会动）
                     estimated_wall_y_ = 0.95 * estimated_wall_y_ + 0.05 * current_implied_wall_y;
                     
                     if (!wall_y_initialized_) { estimated_wall_y_ = current_implied_wall_y; wall_y_initialized_ = true; }
@@ -1773,8 +1704,6 @@ public:
                     // 动态 Sigma: 内点越多，权重越高 (Sigma越小)
                     double dynamic_sigma = std::max(0.02, std::min(0.5, 0.1 * (30.0 / (line_res.inliers + 1.0)))); 
                     
-                    // 距离的权重应该比角度更敏感，因为我们想拉直墙面
-                    // 这里我们构造一个 Vector2 的噪声模型
                     auto line_noise = noiseModel::Diagonal::Sigmas(gtsam::Vector2(dynamic_sigma, dynamic_sigma * 0.5));
 
                     new_factors.add(boost::make_shared<SemanticLineFactor>(
@@ -1782,19 +1711,16 @@ public:
                         noiseModel::Robust::Create(noiseModel::mEstimator::Huber::Create(1.345), line_noise)
                     ));
                     
-                    // Debug Log
                     // if (key_index_ % 10 == 0) std::cout << "Wall Locked at Y=" << estimated_wall_y_ << " Dist=" << measured_dist << std::endl;
                 }
             }
 
-            // --- 5. 周期性结构 (网格吸附 - 安全熔断版) ---
             if (leg_trigger_active && !front_wall_detected) { 
                 double norm_conf = std::min(1.0, periodicity_conf); 
                 double current_x = pred_pose.x();
                 double target_x = std::round(current_x / estimated_spacing) * estimated_spacing;
                 double snap_error = std::abs(current_x - target_x);
 
-                // [⚡核心修改⚡] 熔断机制：如果误差超过间距的 25% (例如 0.4m)，说明吸附错了，直接放弃！
                 // 强行吸附会导致因子图崩溃 (GTSAM Error)
                 if (snap_error > (estimated_spacing * 0.25)) {
                     ROS_WARN_THROTTLE(1.0, "[Grid] SNAP REJECTED! Error too large: %.3fm (Limit: %.3fm)", 
@@ -1814,7 +1740,7 @@ public:
                     new_factors.add(boost::make_shared<StructurePeriodicityFactor>(
                         X(key_index_), estimated_spacing, 
                         noiseModel::Robust::Create(
-                            noiseModel::mEstimator::Huber::Create(1.345), // <--- 关键保护
+                            noiseModel::mEstimator::Huber::Create(1.345),
                             noiseModel::Diagonal::Sigmas(Vector1(final_sigma))
                         )
                     ));
@@ -1822,19 +1748,15 @@ public:
                 }
             }
 
-            // --- 6. 地面约束 (走廊模式) ---
             if (has_plane) {
                 new_factors.add(boost::make_shared<GroundPlaneFactor>(X(key_index_), plane_coeffs, noiseModel::Diagonal::Sigmas((Vector(4) << 0.1, 0.1, 0.1, 0.1).finished())));
             } else {
                 new_factors.add(boost::make_shared<PlanarConstraintFactor>(X(key_index_), 0.0, noiseModel::Diagonal::Sigmas(Vector3(0.05, 0.05, 0.05)))); 
             }
 
-            // --- 7. 航向约束 & 轨道锁定 ---
 
             
-            // --- 7. 航向约束 & 轨道锁定 ---
             
-            // [修改 1] 移除 is_reversing 检查，只要 upstream 发送了锁定信号就执行
             if (use_course_lock) { 
                 double current_yaw = pred_pose.rotation().yaw();
                 double yaw_error = current_yaw - target_course_yaw;
@@ -1851,7 +1773,6 @@ public:
                         
                         gtsam::Pose3 target_pose(target_rot, anchor_point);
                         
-                        // [修改 3] 动态轨道约束：前进紧，后退松
                         // 倒车时给 15cm (0.15) 的横向自由度，允许蛇形走位，但大方向必须对
                         double current_rail_y_sigma = is_reversing ? 0.15 : 0.005; 
                         double current_rail_yaw_sigma = is_reversing ? 0.10 : 0.02; // 倒车允许角度晃动
@@ -1887,10 +1808,7 @@ public:
             }
 
         } else { 
-            // =========================================================
-            // --- [摆渡模式执行] (Ferrying Mode Active) ---
             // 此时只添加非常松散的 Z 轴约束防止飞天，其余完全依赖里程计
-            // =========================================================
             
             // 摆渡时添加一个松散的平面约束 (Z=0)，防止长时间纯积分导致高度漂移
             new_factors.add(boost::make_shared<PlanarConstraintFactor>(X(key_index_), 0.0, 
@@ -1899,13 +1817,11 @@ public:
             ROS_INFO_THROTTLE(2.0, "[Tracker] FERRYING MODE. Pure Odometry Active.");
         }
 
-        // --- 8. 退化保护 ---
         if (is_degenerate_ && !has_vis_vel && !leg_trigger_active) {
             new_factors.add(BetweenFactor<Vector3>(V(key_index_-1), V(key_index_), gtsam::Vector3(0,0,0), 
                 noiseModel::Diagonal::Sigmas(gtsam::Vector3(0.1, 0.5, 0.5))));
         }
 
-        // --- 9. GTSAM Update ---
         try {
             isam_->update(new_factors, new_values);
             isam_->update(); 
@@ -1928,7 +1844,7 @@ public:
                                 << now.toSec() << " " << max_eigenvalue << " " 
                                 << (max_eigenvalue > 0.05 ? 1 : 0) << " " 
                                 << (leg_trigger_active ? 1 : 0) << " " 
-                                << log_structure_sigma  // [修改] 使用捕获的变量替换 0.0
+                                << log_structure_sigma
                                 << std::endl;
                         }
                         if (max_eigenvalue > 0.05) { 
@@ -2006,7 +1922,6 @@ private:
     bool is_degenerate_ = false;
 };
 
-// ================= [🔴 最终修复版 V13：删除重复定义，编译通过] =================
 
 class StructureOdometer {
     public:
@@ -2165,7 +2080,6 @@ class StructureOdometer {
             bool has_vis_vel, const gtsam::Vector3& vis_vel, double vis_conf, double avg_vis_depth) {
             std::lock_guard<std::mutex> lock(odom_mutex_);
 
-            // ================= [1. 文件流定义] =================
             static std::ofstream f_legs("/home/jiangjiacheeng/spm_data/leg_indices.txt", std::ios::out); 
             static bool legs_header_written = false;
             static std::ofstream f_feats("/home/jiangjiacheeng/spm_data/features.txt", std::ios::out);
@@ -2184,18 +2098,15 @@ class StructureOdometer {
             if (dt < 0.001) return;
             last_proc_time_ = now;
 
-            // ================= [2. 更新速度状态] =================
             if (is_ferrying_mode_) {
                 wheel_speed_ = enc_speed_; wheel_omega_ = enc_omega_;
             } else {
                 wheel_speed_ = enc_speed_; wheel_omega_ = enc_omega_;
             }
 
-            // [🔴 修复点] 必须在这里定义，确保全局可见
             bool is_moving_forward = (wheel_speed_ > 0.05);
             bool is_reversing = (wheel_speed_ < -0.05);
 
-            // ================= [3. 激进版：原地转向锁 (Spot Turn Lock)] =================
             const double ENC_SCALE_FWD = 1.071; 
             const double ENC_SCALE_REV = 1.0477; 
             double current_scale = (wheel_speed_ >= 0.0) ? ENC_SCALE_FWD : ENC_SCALE_REV;
@@ -2230,9 +2141,7 @@ class StructureOdometer {
             if (std::abs(input_vx) > 0.001) { 
                 predicted_dist_ += dist_step; 
             }
-            // ======================================================================
 
-            // ================= [4. LIO 健康检测] =================
             bool lio_current_stuck = false;
             
             if (std::abs(wheel_speed_) > 0.2) { 
@@ -2261,7 +2170,6 @@ class StructureOdometer {
                 }
             }
 
-            // ================= [5. 熔断逻辑] =================
             if (lio_current_stuck) continuous_degraded_time_ += dt; 
             else {
                 if (continuous_degraded_time_ > 0) continuous_degraded_time_ -= dt;
@@ -2282,7 +2190,6 @@ class StructureOdometer {
             if (is_ferrying_mode_) is_lio_healthy_ = true; 
             if (!has_lio_data_) is_lio_healthy_ = false; 
 
-            // ================= [6. 策略分支] =================
 
             if (is_lio_healthy_) {
                 if (was_degraded_) {
@@ -2334,7 +2241,6 @@ class StructureOdometer {
                 return; 
             } 
 
-            // ================= [7. 救援模式逻辑] =================
             was_degraded_ = true;
             
             double input_vy = 0.0;
@@ -2342,7 +2248,6 @@ class StructureOdometer {
 
             bool add_periodicity_factor = false; 
             if (!is_ferrying_mode_) {
-                // [🔴 现在 is_reversing 可以在这里被正确访问了]
                 double effective_thresh = is_reversing ? (config.trigger_thresh * 0.6) : config.trigger_thresh;
                 bool leg_detected = (measurement > effective_thresh);
                 
@@ -2442,9 +2347,8 @@ class StructureOdometer {
                 // 画出指向 VP 的紫色引导线
                 cv::line(img, cv::Point(img.cols/2, img.rows), vp_res.pt, cv::Scalar(255, 0, 255), 2); 
                 
-                // [🔴 修复] 将这两行加回来，画出 VP 点
                 cv::circle(img, vp_res.pt, 6, cv::Scalar(0, 255, 255), -1); // 黄色实心点 (VP位置)
-                cv::circle(img, vp_res.pt, 10, cv::Scalar(0, 0, 255), 2);   // 红色空心圆环 (醒目提示)
+                cv::circle(img, vp_res.pt, 10, cv::Scalar(0, 0, 255), 2);
             }
     
             int line_y = 30;
@@ -2636,7 +2540,6 @@ class StructureOdometer {
                 verify_radius_ = 0.3;          
                 metal_intensity_thresh_ = 0.5; 
         
-                // [NEW] 初始化流程图可视化话题
                 pub_viz_step1_height_ = nh_.advertise<sensor_msgs::Image>("process/1_geometric_height", 1);
                 pub_viz_step2_hsv_ = nh_.advertise<sensor_msgs::Image>("process/2_color_rejection", 1);
                 pub_viz_step3_morph_ = nh_.advertise<sensor_msgs::Image>("process/3_morphological", 1);
@@ -2664,7 +2567,6 @@ class StructureOdometer {
             ~SemanticOctomapServer() { 
                 std::cout << "\n\n[System] Node shutting down. Attempting to save map..." << std::endl;
                 
-                // 强制保存
                 saveMap(); 
 
                 sub_lidar_.shutdown(); 
@@ -2739,7 +2641,6 @@ class StructureOdometer {
                 return false;
             }
         
-            // [🔴 进阶玩法] 阶段 1：图像处理与掩膜生成
             void syncCallback(const sensor_msgs::ImageConstPtr& depth_msg, const sensor_msgs::ImageConstPtr& rgb_msg) {
                 // 1. 转换图像
                 cv_bridge::CvImagePtr cv_rgb_ptr;
@@ -2762,8 +2663,6 @@ class StructureOdometer {
                     gtsam::Point3(transform.getOrigin().x(), transform.getOrigin().y(), transform.getOrigin().z())
                 );
                 
-                // 3. 图像处理：提取红色的笼子腿 (复用你之前的逻辑)
-                // 简单起见，我们直接用颜色提取，不再做繁琐的深度校验，因为点云投影会负责深度校验
                 cv::Mat hsv_img, mask_red1, mask_red2, cage_mask;
                 cv::cvtColor(rgb_img, hsv_img, cv::COLOR_BGR2HSV);
                 
@@ -2774,22 +2673,19 @@ class StructureOdometer {
 
                 // 形态学操作：去噪
                 cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
-                // [🔴 修改] 针对镂空笼子的“补洞”策略
                 // 1. 先做开运算去噪 (去掉孤立噪点)
                 cv::Mat kernel_noise = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
                 cv::morphologyEx(cage_mask, cage_mask, cv::MORPH_OPEN, kernel_noise);
 
-                // 2. [核心] 使用巨大的核进行“闭运算 (CLOSE)”
                 // 闭运算 = 先膨胀后腐蚀。它能填平物体内部的小黑洞，但保持物体轮廓不变。
                 // Size(9, 9) 意味着能填补 9 像素宽的网格空隙。如果网眼更大，可以设为 (15, 15)
                 cv::Mat kernel_fill = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(15, 15)); 
                 cv::morphologyEx(cage_mask, cage_mask, cv::MORPH_CLOSE, kernel_fill);
                 
-                // 3. 再稍微膨胀一点点，增加容错
+
                 cv::Mat kernel_dilate = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(5, 5)); 
                 cv::morphologyEx(cage_mask, cage_mask, cv::MORPH_DILATE, kernel_dilate);
 
-                // 4. [核心] 将掩膜和位姿存入全局变量，供 Lidar 线程使用
                 {
                     std::lock_guard<std::mutex> lock(viz_mutex_);
                     latest_cage_mask_ = cage_mask.clone();
@@ -2797,10 +2693,9 @@ class StructureOdometer {
                     has_new_image_ = true;
                 }
 
-                // 5. 可视化一下，让自己放心
                 if (pub_debug_img_.getNumSubscribers() > 0) {
                      cv::Mat debug_viz;
-                     rgb_img.copyTo(debug_viz, cage_mask); // 只显示提取出来的部分
+                     rgb_img.copyTo(debug_viz, cage_mask);
                      pub_debug_img_.publish(cv_bridge::CvImage(depth_msg->header, "bgr8", debug_viz).toImageMsg());
                 }
             }
@@ -2897,7 +2792,6 @@ class StructureOdometer {
                 return out_cloud;
             }
         
-            // [🏆 最终修复版 V4] lidarCallback
             // 特性：强制过道净空 (Corridor Keep-out Zone)
             // 逻辑：在定义的过道宽度内，只有红色点能存活，灰色点全部抹杀。
             void lidarCallback(const sensor_msgs::PointCloud2::ConstPtr& msg) {
@@ -2930,10 +2824,7 @@ class StructureOdometer {
                 bool assume_input_is_body_frame = true; 
                 double current_v = semantic_odom_.wheel_speed_; 
 
-                // ================= [🛡️ 过道净空参数配置] =================
                 
-                // 1. [过道物理半宽]：你的过道约 1.3m -> 半宽 0.65m
-                // 我们留一点余量，设为 0.55m。
                 // 含义：机器人中心左右 0.55m (总宽1.1m) 内，绝不允许出现灰色杂点。
                 double corridor_clean_half_width = 0.55; 
 
@@ -2946,7 +2837,6 @@ class StructureOdometer {
                 
                 // 4. 起点黑洞半径
                 double start_exclusion_radius = 1.5; 
-                // =========================================================
 
                 for (const auto& p : input_cloud.points) {
                     if (p.z > config.z_ceiling) continue;
@@ -2954,11 +2844,9 @@ class StructureOdometer {
                     // 1. 计算世界坐标
                     gtsam::Point3 pt_w(p.x, p.y, p.z);
                     
-                    // [🥊 原点黑洞] 过滤起点附近的喂料机
                     float dist_from_origin = std::sqrt(pt_w.x()*pt_w.x() + pt_w.y()*pt_w.y());
                     if (dist_from_origin < start_exclusion_radius) continue; 
 
-                    // [🎨 地面绿化]
                     if (p.z < 0.15 && p.z > -1.0) {
                         pcl::PointXYZRGB p_ground;
                         p_ground.x = p.x; p_ground.y = p.y; p_ground.z = p.z;
@@ -3006,7 +2894,6 @@ class StructureOdometer {
                         hit_done:;
                     }
 
-                    // ================= [🧠 核心逻辑：过道净空协议] =================
                     
                     if (is_cage) {
                         // 【红色特权】：允许进入过道区域
@@ -3021,9 +2908,6 @@ class StructureOdometer {
                         colored_scan->points.push_back(p_obj);
                     } 
                     else {
-                        // 【灰色严管】：必须滚出过道！
-                        // 既然你不是笼子，如果你出现在了 corridor_clean_half_width (0.55m) 范围内，
-                        // 我不管你是操作员、苍蝇还是误差，直接删除。
                         if (abs_y < corridor_clean_half_width) continue; 
                         
                         // 高度限制 (1.6m)
@@ -3034,9 +2918,6 @@ class StructureOdometer {
                     }
                 }
 
-                // ==========================================
-                // 阶段 2: 智能补全 (同步应用净空协议)
-                // ==========================================
                 if (hit_depths.size() > 10) { 
                     double sum = std::accumulate(hit_depths.begin(), hit_depths.end(), 0.0);
                     double mean = sum / hit_depths.size();
@@ -3060,7 +2941,7 @@ class StructureOdometer {
                                         if (assume_input_is_body_frame) pt_c = gtsam::Point3(z_opt, -x_opt, -y_opt);
                                         else pt_c = gtsam::Point3(x_opt, y_opt, z_opt);
                                         
-                                        // 补全点默认是红色的，所以使用宽松的 red_min_dist
+
                                         if (std::abs(pt_c.y()) < red_min_dist) continue;
 
                                         gtsam::Point3 pt_w = T_w_c.transformFrom(pt_c);
@@ -3081,9 +2962,6 @@ class StructureOdometer {
                     }
                 }
 
-                // ==========================================
-                // 阶段 3: 合并 (保持不变)
-                // ==========================================
                 {
                     std::unique_lock<std::shared_mutex> map_lock(map_mutex_); 
                     for (const auto& p : colored_scan->points) {
@@ -3132,23 +3010,18 @@ class StructureOdometer {
             }
 
 
-            // [💾 调试增强版] saveMap - 支持 .ot 和 .pcd 双格式保存
             void saveMap() {
-                // 加锁
                 std::shared_lock<std::shared_mutex> map_lock(map_mutex_); 
 
-                // 1. 打印当前地图点数，帮你确认是否有数据
                 std::cout << "\n[System] Checking map status... Points: " << global_voxel_map_.size() << std::endl;
 
                 if (global_voxel_map_.empty()) {
-                    // ⚠️ 重点：如果看到这句话，说明机器人没走出“黑洞”，或者没扫到有效点
                     std::cout << "\033[1;33m[Warning] Map is EMPTY! (Did robot move past the 2.5m exclusion zone?)\033[0m" << std::endl;
                     return;
                 }
 
                 std::cout << "[System] Saving map to disk..." << std::endl;
 
-                // ================= [保存 OctoMap (.ot)] =================
                 octomap::ColorOcTree tree(0.05); // 0.05m 分辨率
 
                 // 准备 PCD 点云容器 (用于保存 PCD)
@@ -3183,7 +3056,6 @@ class StructureOdometer {
                     std::cout << "\033[1;31m[Error] Failed to save .ot file " << filename_ot << "\033[0m" << std::endl;
                 }
 
-                // ================= [保存 PCD (.pcd)] =================
                 std::string filename_pcd = "/home/jiangjiacheeng/spm_data/semantic_map.pcd";
                 try {
                     // 使用二进制模式保存，体积更小，读写更快
@@ -3471,7 +3343,6 @@ class StructureOdometer {
             }
         
         private:
-            // [NEW] 论文插图专用发布器
             ros::Publisher pub_viz_step1_height_;   // 1. 几何高度分割 (红/绿)
             ros::Publisher pub_viz_step2_hsv_;      // 2. 颜色抑制结果
             ros::Publisher pub_viz_step3_morph_;    // 3. 形态学滤波掩膜
@@ -3493,10 +3364,9 @@ class StructureOdometer {
             std::mutex lidar_mutex_;          
             double verify_radius_;            
             double metal_intensity_thresh_;   
-            std::shared_mutex map_mutex_; // [修改] 使用读写锁 C++17
+            std::shared_mutex map_mutex_;
 
 
-            // ================= [🔴 进阶玩法：新增成员变量] =================
             // 1. 全局语义点云地图 (带颜色)
             pcl::PointCloud<pcl::PointXYZRGB>::Ptr global_semantic_cloud_{new pcl::PointCloud<pcl::PointXYZRGB>()};
             
@@ -3509,7 +3379,6 @@ class StructureOdometer {
             // 3. 降采样滤波器 (防止地图点数无限膨胀)
             pcl::VoxelGrid<pcl::PointXYZRGB> voxel_filter_;
 
-            // ================= [🔴 针对镂空笼子的特殊数据结构] =================
             struct VoxelKey {
                 int x, y, z;
                 bool operator==(const VoxelKey& other) const {
@@ -3527,8 +3396,6 @@ class StructureOdometer {
             // Key: 空间体素索引, Value: 该位置的颜色点
             std::unordered_map<VoxelKey, pcl::PointXYZRGB, VoxelHash> global_voxel_map_;
             float map_resolution_ = 0.05; // 5cm 分辨率
-            // ===============================================================
-            // ============================================================
             
             StructuralFeatureExtractor feature_extractor_;
             VisualFlowEstimator flow_estimator_;
@@ -3536,12 +3403,11 @@ class StructureOdometer {
         
             struct TemporalInfo {
                 int hit_count;            
-                int distinct_views;          // [新增] 独立视角计数 (空间多样性)
-                gtsam::Point3 last_view_pos; // [新增] 上一次有效观测时的传感器位置
+                int distinct_views;
+                gtsam::Point3 last_view_pos;
                 ros::Time first_seen_time; 
                 ros::Time last_seen_time;  
                 
-                // 初始化构造器
                 TemporalInfo() : hit_count(0), distinct_views(0), 
                                  last_view_pos(0,0,0), first_seen_time(0), last_seen_time(0) {}
             };
