@@ -14,6 +14,7 @@ src/
   semantic_octomap_mapping/    Semantic OctoMap mapping node, launch file, and RViz config
 docs/
   demonstration_materials.md   Demonstration-material index and release notes
+  s2p_slam_vp_debug_rgb_60s.mp4  60 s diagnostic demonstration video
 ```
 
 The full experimental system also used standard ROS driver packages for LiDAR, IMU/AHRS, and Intel RealSense RGB-D cameras. These driver packages are not vendored in this lightweight release to keep the repository small and reviewable.
@@ -54,11 +55,13 @@ Install or clone the required sensor driver packages according to your hardware 
 
 ## Demonstration materials
 
-Large raw videos, ROS bags, and point-cloud maps are intentionally excluded from Git. Demonstration videos and large experimental artifacts should be attached as GitHub Release assets or linked from:
+The repository includes a 60 s demonstration video recorded directly from the ROS image topic `/vp_debug_rgb`:
 
-```text
-docs/demonstration_materials.md
-```
+- [S2P-SLAM 60 s diagnostic visualization](docs/s2p_slam_vp_debug_rgb_60s.mp4)
+
+Additional notes are listed in [docs/demonstration_materials.md](docs/demonstration_materials.md).
+
+Large raw ROS bags and point-cloud maps are intentionally excluded from Git.
 
 ## Excluded large files
 
@@ -66,6 +69,5 @@ The following file types are intentionally not tracked:
 
 - ROS bags: `*.bag`
 - Point clouds/maps: `*.pcd`, `*.ply`
-- Raw videos: `*.mp4`, `*.avi`, `*.mov`, `*.mkv`
+- Raw videos: `*.avi`, `*.mov`, `*.mkv`
 - Build products: `build/`, `devel/`, `install/`
-

@@ -11,6 +11,7 @@ CMakeCache.txt
 *.pcd
 *.ply
 *.mp4
+!docs/s2p_slam_vp_debug_rgb_60s.mp4
 *.avi
 *.mov
 *.mkv
@@ -27,4 +28,3 @@ __pycache__/
 .vscode/
 .idea/
 .env
-
