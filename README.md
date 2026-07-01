@@ -57,9 +57,9 @@ Install or clone the required sensor driver packages according to your hardware 
 
 The repository includes a 60 s demonstration video recorded directly from the ROS image topic `/vp_debug_rgb`:
 
-<video src="https://github.com/Jiangjiacheng-scau/S2P-SLAM/raw/main/docs/s2p_slam_vp_debug_rgb_60s.mp4" controls width="100%"></video>
+[![S2P-SLAM 60 s diagnostic visualization](docs/s2p_slam_vp_debug_rgb_60s_thumbnail.jpg)](https://raw.githubusercontent.com/Jiangjiacheng-scau/S2P-SLAM/main/docs/s2p_slam_vp_debug_rgb_60s.mp4)
 
-- [S2P-SLAM 60 s diagnostic visualization](docs/s2p_slam_vp_debug_rgb_60s.mp4)
+Click the preview above to play the MP4 directly in the browser. If your browser downloads the file instead, use the direct fallback link: [S2P-SLAM 60 s diagnostic visualization](https://raw.githubusercontent.com/Jiangjiacheng-scau/S2P-SLAM/main/docs/s2p_slam_vp_debug_rgb_60s.mp4).
 
 Additional notes are listed in [docs/demonstration_materials.md](docs/demonstration_materials.md).
 
