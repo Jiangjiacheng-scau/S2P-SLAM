@@ -5,11 +5,7 @@ Code snapshot for the manuscript:
 **S2P-SLAM: Structural-periodicity and unit-sphere polarity constraints for visual–LiDAR–inertial SLAM in a caged poultry house**
 
 This repository provides the ROS source and configuration used for
-poultry-house localization and spatiotemporal semantic mapping.  The recovered
-`semantic_octomap_mapping` implementation has been synchronized with the
-submitted method: it uses the augmented state
-`(T_WB, v_W, [kappa_v,kappa_omega], lambda)`, conditionally admitted factors,
-deterministic LIO/fallback switching, and posterior-pose-only STSM integration.
+poultry-house localization and spatiotemporal semantic mapping.
 
 ## Repository layout
 
