@@ -1,14 +1,14 @@
-# S2P-SLAM method-to-code alignment
+# S2P-SLAM implementation notes
 
-This package is the recovered implementation aligned with the submitted
-manuscript.  The manuscript, rather than the legacy source file, is the
-normative specification for the behavior summarized below.
+This document summarizes the estimator, structural frontend, integrity
+switching, and spatiotemporal semantic-mapping behavior implemented by the ROS
+package.
 
 ## Estimator state and admitted factors
 
 The iSAM2 state at keyframe `k` is `(T_WB, v_W, c, lambda)`.  The code stores
 `ell = log(lambda)` as the scalar graph variable; additive updates of `ell`
-implement the manuscript's multiplicative positive-state retraction exactly:
+implement a multiplicative positive-state update:
 `lambda_new = lambda * exp(delta_ell)`.
 
 The quadratic factor set contains LIO relative pose, pose--velocity
@@ -107,6 +107,5 @@ roslaunch semantic_octomap_mapping mapping.launch
 Set `S2P_LOG_DIR` to an existing writable directory to enable trajectory
 logging.  The launch file contains the evaluation defaults; camera intrinsics
 and the nominal `T_BC^0` must be replaced when the sensor installation changes.
-The principal Full-minus-one switches are exposed as launch arguments; the
-reported semantic removal disables both `enable_semantic_gate` and
-`enable_stsm`.
+The principal components are exposed as launch arguments; a semantic-mapping
+ablation disables both `enable_semantic_gate` and `enable_stsm`.

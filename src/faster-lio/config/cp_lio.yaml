@@ -38,7 +38,7 @@ publish:
   dense_publish_en: true         # ⚠️ Set to true to see a denser map in Rviz
   scan_bodyframe_pub_en: true    # Publish scan in body frame
 
-path_save_en: true               # Save trajectory to file (essential for paper comparison)
+path_save_en: true               # Save the estimated trajectory to file
 
 pcd_save:
   pcd_save_en: true           # Disable during debugging to save disk space. Enable for final mapping.

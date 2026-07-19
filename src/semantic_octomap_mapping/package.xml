@@ -8,8 +8,7 @@
   </description>
 
   <maintainer email="Jiangjiacheng-scau@users.noreply.github.com">Jiacheng Jiang</maintainer>
-  <!-- No license was declared in the recovered package.  Select a repository
-       license explicitly before redistributing binaries. -->
+  <!-- Select a repository license explicitly before redistributing binaries. -->
   <license>TODO</license>
 
   <buildtool_depend>catkin</buildtool_depend>

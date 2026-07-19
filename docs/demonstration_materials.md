@@ -1,6 +1,6 @@
 # Demonstration Materials
 
-This page records demonstration materials associated with the S2P-SLAM manuscript.
+This page indexes demonstration materials for S2P-SLAM.
 
 ## Included video
 

@@ -1,10 +1,8 @@
 // S2P-SLAM: structural-periodicity and unit-sphere polarity constraints.
 //
-// This file is the executable reference implementation accompanying the
-// manuscript.  The implementation deliberately keeps localization and map
-// maintenance in separate data paths: only admitted measurements create graph
-// factors, and the persistent semantic map never feeds measurements back to the
-// estimator.
+// Localization and map maintenance use separate data paths: only admitted
+// measurements create graph factors, and the persistent semantic map never
+// feeds measurements back to the estimator.
 
 #include <ros/ros.h>
 
@@ -1427,7 +1425,7 @@ class StructureFrontend {
   }
 
   static double flowDepthVariance(const double depth) {
-    // Interpolated empirical profile reported for the retained camera/aisle
+    // Depth-dependent empirical profile for the retained camera/aisle
     // configuration: near-field mixing and far-field quantization receive
     // lower weights than the 1.8--2.4 m residual basin.
     constexpr std::array<double, 6> kDepth{

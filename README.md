@@ -1,11 +1,10 @@
 # S2P-SLAM
 
-Code snapshot for the manuscript:
-
-**S2P-SLAM: Structural-periodicity and unit-sphere polarity constraints for visual–LiDAR–inertial SLAM in a caged poultry house**
-
-This repository provides the ROS source and configuration used for
-poultry-house localization and spatiotemporal semantic mapping.
+S2P-SLAM is a ROS-based visual–LiDAR–inertial localization and spatiotemporal
+semantic-mapping system for structurally repetitive poultry-house aisles. The
+`semantic_octomap_mapping` package implements an augmented estimator state,
+conditionally admitted factors, deterministic LIO/fallback switching, and
+posterior-pose-only STSM integration.
 
 ## Repository layout
 
@@ -18,9 +17,9 @@ docs/
   s2p_slam_vp_debug_rgb_60s.mp4  60 s diagnostic demonstration video
 ```
 
-The detailed method-to-code correspondence and the input-frame assumptions are
+The estimator structure, mapping behavior, and input-frame assumptions are
 documented in
-[`src/semantic_octomap_mapping/METHOD_ALIGNMENT.md`](src/semantic_octomap_mapping/METHOD_ALIGNMENT.md).
+[`src/semantic_octomap_mapping/IMPLEMENTATION_NOTES.md`](src/semantic_octomap_mapping/IMPLEMENTATION_NOTES.md).
 
 The full experimental system also used standard ROS driver packages for LiDAR, IMU/AHRS, and Intel RealSense RGB-D cameras. These driver packages are not vendored in this lightweight release to keep the repository small and reviewable.
 
@@ -58,7 +57,7 @@ source devel/setup.bash
 
 Install or clone the required sensor driver packages according to your hardware setup before building the full online system.
 
-Run the aligned backend and mapper with:
+Run the backend and mapper with:
 
 ```bash
 roslaunch semantic_octomap_mapping mapping.launch
@@ -68,10 +67,10 @@ This launch file starts the bundled Faster-LIO front end by default.  If an
 external LIO instance is already publishing the configured odometry and point
 cloud topics, use `start_faster_lio:=false`.
 
-The matched removals can be selected without editing source code through the
+Optional components can be selected without editing source code through the
 launch arguments `enable_periodicity`, `enable_virtual_rail`, `enable_vp`,
-`enable_hybrid`, `enable_semantic_gate`, and `enable_stsm`.  The manuscript's
-combined semantic-gate/STSM removal sets the last two arguments to `false`.
+`enable_hybrid`, `enable_semantic_gate`, and `enable_stsm`. A semantic-gate/STSM
+ablation sets the last two arguments to `false`.
 
 Camera intrinsics and the nominal camera-to-body transform in the launch file
 must be replaced when the sensor installation changes.  The optional
@@ -79,7 +78,8 @@ must be replaced when the sensor installation changes.  The optional
 gate used during recovery; the LIO odometry covariance must also be positive
 definite before recovery is accepted.
 
-The package includes static regression tests for manuscript-critical choices:
+The package includes static regression tests for critical implementation
+invariants:
 
 ```bash
 python3 -m unittest discover src/semantic_octomap_mapping/test -v

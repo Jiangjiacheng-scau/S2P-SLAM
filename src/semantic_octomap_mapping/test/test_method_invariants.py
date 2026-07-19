@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Static regression checks for manuscript-critical implementation choices."""
+"""Static regression checks for critical implementation invariants."""
 
 from pathlib import Path
 import re
@@ -48,7 +48,7 @@ class MethodInvariantTests(unittest.TestCase):
         self.assertIn("promote(key, record)", process_body)
         self.assertIn("void integrateRay", SOURCE)
 
-    def test_stsm_constants_match_the_manuscript(self):
+    def test_stsm_default_constants(self):
         expected = {
             "voxel_resolution": "0.05",
             "viewpoint_baseline": "0.20",
@@ -121,7 +121,7 @@ class MethodInvariantTests(unittest.TestCase):
     def test_published_pose_covariance_reorders_gtsam_to_ros(self):
         self.assertIn("kRosToGtsam{3, 4, 5, 0, 1, 2}", SOURCE)
 
-    def test_reported_factor_removals_have_explicit_switches(self):
+    def test_configurable_factor_switches_are_explicit(self):
         for switch in (
             "enable_periodicity",
             "enable_rail",
