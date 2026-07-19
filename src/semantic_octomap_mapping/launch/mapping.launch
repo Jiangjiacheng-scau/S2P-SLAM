@@ -1,46 +1,113 @@
 <launch>
-  <param name="/use_sim_time" value="true" />
+  <!-- Sensor topics. -->
+  <arg name="lio_odom_topic" default="/Odometry" />
+  <arg name="lio_status_topic" default="/s2p/lio_converged" />
+  <arg name="wheel_odom_topic" default="/odom" />
+  <arg name="command_topic" default="/cmd_vel" />
+  <arg name="lidar_topic" default="/cloud_registered_effect_world" />
+  <arg name="rgb_topic" default="/front_camera/color/image_raw" />
+  <arg name="depth_topic" default="/front_camera/aligned_depth_to_color/image_raw" />
+  <arg name="world_frame" default="s2p_world" />
+  <arg name="body_frame" default="body" />
+  <arg name="start_faster_lio" default="true" />
+  <arg name="run_rviz" default="false" />
+  <arg name="enable_periodicity" default="true" />
+  <arg name="enable_virtual_rail" default="true" />
+  <arg name="enable_vp" default="true" />
+  <arg name="enable_line" default="true" />
+  <arg name="enable_ground" default="true" />
+  <arg name="enable_visual_flow" default="true" />
+  <arg name="enable_hybrid" default="true" />
+  <arg name="enable_semantic_gate" default="true" />
+  <arg name="enable_stsm" default="true" />
 
-  <rosparam command="load" file="$(find faster_lio)/config/cp_lio.yaml" />
-  <node pkg="faster_lio" type="run_mapping_online" name="laserMapping" output="screen" />
+  <include if="$(arg start_faster_lio)"
+           file="$(find faster_lio)/launch/cp_lio.launch">
+    <arg name="rviz" value="false" />
+  </include>
 
-  <node pkg="tf" type="static_transform_publisher" name="camera_base_link" 
-        args="0.1 0 0 1.5708 0 0 body front_camera_color_optical_frame 100" />
+  <node pkg="semantic_octomap_mapping"
+        type="semantic_octomap_node"
+        name="semantic_octomap_node"
+        output="screen">
+    <param name="lio_odom_topic" value="$(arg lio_odom_topic)" />
+    <param name="lio_status_topic" value="$(arg lio_status_topic)" />
+    <param name="wheel_odom_topic" value="$(arg wheel_odom_topic)" />
+    <param name="command_topic" value="$(arg command_topic)" />
+    <param name="lidar_topic" value="$(arg lidar_topic)" />
+    <param name="rgb_topic" value="$(arg rgb_topic)" />
+    <param name="depth_topic" value="$(arg depth_topic)" />
+    <param name="global_frame_id" value="$(arg world_frame)" />
+    <param name="body_frame_id" value="$(arg body_frame)" />
 
-  <node pkg="semantic_octomap_mapping" type="semantic_octomap_node" name="semantic_octomap_node" output="screen">
-    
-    <param name="z_ceiling" value="3.5" />
-    <param name="lidar_z_min" value="0.3" />
-    <param name="lidar_z_max" value="2.5" />
-    <param name="leg_spacing" value="1.8" />
+    <!-- D435i intrinsics used in the recorded evaluation. -->
+    <param name="cam_fx" value="904.3275" />
+    <param name="cam_fy" value="903.9418" />
+    <param name="cam_cx" value="653.1630" />
+    <param name="cam_cy" value="369.6624" />
 
-    <param name="z_obstacle_thresh" value="2.05" />
-    <param name="ground_offset_k" value="0.5" />
-    
-    <param name="ground_safe_height_ratio" value="1" />
-    <param name="ground_safe_width_ratio" value="0" />
+    <!-- Fixed nominal T_BC^0.  Override these values with the calibrated
+         transform for a different sensor installation. -->
+    <param name="t_bc_x" value="0.10" />
+    <param name="t_bc_y" value="0.0" />
+    <param name="t_bc_z" value="0.0" />
+    <param name="r_bc_roll" value="-1.57079632679" />
+    <param name="r_bc_pitch" value="0.0" />
+    <param name="r_bc_yaw" value="-1.57079632679" />
 
-    <param name="camera_z_shift" value="-0.2" />
+    <!-- Structure-aware front end. -->
+    <param name="depth_min" value="0.30" />
+    <param name="depth_max" value="8.0" />
+    <param name="h_floor" value="0.10" />
+    <param name="h_ceiling" value="3.50" />
+    <param name="gamma" value="0.70" />
+    <param name="period_min" value="1.50" />
+    <param name="period_max" value="1.80" />
+    <param name="period_confidence_min" value="0.40" />
+    <param name="period_support_min" value="3" />
+    <param name="period_smoothing" value="0.05" />
+    <param name="flow_min_inliers" value="30" />
+    <param name="flow_ransac_threshold" value="0.10" />
 
-    <param name="hole_fill_area" value="4000.0" />
-    <param name="hsv_s_min" value="40" /> 
-    <param name="hsv_v_min" value="30" /> 
+    <!-- Factor graph and integrity monitor. -->
+    <param name="initial_period" value="1.66" />
+    <param name="initial_body_height" value="0.50" />
+    <param name="slip_variance_v" value="0.00010" />
+    <param name="slip_variance_w" value="0.00015" />
+    <param name="slip_turn_gain" value="0.01" />
+    <param name="rail_covariance_threshold" value="0.05" />
+    <param name="lio_failure_time" value="2.0" />
+    <param name="lio_recovery_time" value="1.0" />
+    <param name="enable_periodicity_factor" value="$(arg enable_periodicity)" />
+    <param name="enable_virtual_rail_factor" value="$(arg enable_virtual_rail)" />
+    <param name="enable_vp_factor" value="$(arg enable_vp)" />
+    <param name="enable_line_factor" value="$(arg enable_line)" />
+    <param name="enable_ground_factor" value="$(arg enable_ground)" />
+    <param name="enable_visual_flow" value="$(arg enable_visual_flow)" />
+    <param name="enable_hybrid_factor" value="$(arg enable_hybrid)" />
+    <param name="enable_semantic_gate" value="$(arg enable_semantic_gate)" />
 
-    <param name="kernel_far_w" value="1" /> <param name="kernel_far_h" value="3" />
-    <param name="kernel_near_w" value="2" /> <param name="kernel_near_h" value="10" />
-
-    <param name="roi_h_ratio" value="0.1" />
-    <param name="roi_w_ratio" value="0.06" />
-    <param name="trigger_thresh" value="0.10" />
-    <param name="cooldown_time" value="1.5" />
-    <param name="motion_deadzone" value="0.05" />
-    <param name="hard_sync_diff" value="1.0" />
-
+    <!-- STSM: candidates do not update occupancy before promotion. -->
+    <param name="enable_stsm" value="$(arg enable_stsm)" />
+    <param name="voxel_resolution" value="0.05" />
+    <param name="map_ground_height" value="0.10" />
+    <param name="viewpoint_baseline" value="0.20" />
+    <param name="temporal_hit_thresh" value="3" />
+    <param name="temporal_trust_thresh" value="2" />
+    <param name="temporal_static_life" value="2.0" />
+    <param name="candidate_decay" value="1.0" />
+    <param name="semantic_thresh" value="0.75" />
+    <param name="occupancy_thresh" value="0.50" />
+    <param name="occupancy_hit" value="0.60" />
+    <param name="occupancy_miss" value="0.40" />
+    <param name="occupancy_min" value="0.12" />
+    <param name="occupancy_max" value="0.97" />
+    <param name="occupied_neighbor_min" value="5" />
   </node>
 
-  <node pkg="rviz" type="rviz" name="rviz" args="-d /home/jiangjiacheeng/chicken_nav_ws/1.rviz" />
-  <node pkg="rosbag" type="play" name="rosbag_play" 
-        args="--clock -d 2 $(env HOME)/数据集/single2.bag" 
-        output="screen" 
-        required="false"/>
-</launch>   
+  <node if="$(arg run_rviz)"
+        pkg="rviz"
+        type="rviz"
+        name="s2p_rviz"
+        args="-d $(find semantic_octomap_mapping)/rviz/octmap.rviz" />
+</launch>
